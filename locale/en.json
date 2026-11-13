@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "StarAPI",
+    "description": "Paste a StarAPI key once per group and get its Claude and Codex (GPT) models as working providers, with thinking levels measured per model."
+  }
+}

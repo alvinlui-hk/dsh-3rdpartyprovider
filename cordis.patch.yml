@@ -1,0 +1,3 @@
+- insert:
+    - id: starapi
+      name: '@alvinlui-hk/dsh-starapi'
