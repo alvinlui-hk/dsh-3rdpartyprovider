@@ -155,8 +155,14 @@ function streamResponses(res, { model, effort, tool }) {
  */
 export async function startFakeStarapi(options = {}) {
   let mode = options.mode ?? 'ok'
+  let listFails = false
   const concurrency = options.concurrency ?? 3
   const latencyMs = options.latencyMs ?? 15
+  // How many times each model still answers with a bare 500 before behaving normally.
+  const flakyLeft = new Map(Object.entries(options.flaky ?? {}))
+  // Efforts that stay unanswered (bare 503) for one model, so a later probe fails
+  // after availability already succeeded.
+  const flakyEfforts = options.flakyEfforts ?? {}
   const requests = []
   const stats = { rateLimited: 0, peak: 0 }
   let inFlight = 0
@@ -189,6 +195,7 @@ export async function startFakeStarapi(options = {}) {
     const group = key === CLAUDE_KEY ? 'claude' : key === CODEX_KEY ? 'codex' : 'rc'
 
     if (req.method === 'GET' && url.pathname === '/v1/models') {
+      if (listFails) return send(res, 500, { error: { message: 'model list unavailable', type: 'server_error' } })
       const ids = group === 'claude' ? Object.keys(CLAUDE_MODELS) : group === 'codex' ? Object.keys(CODEX_MODELS) : Object.keys(RC_MODELS)
       return send(res, 200, { data: ids.map((id) => ({ id, object: 'model', type: 'model', display_name: id, created_at: '2024-01-01T00:00:00Z' })) })
     }
@@ -216,6 +223,19 @@ export async function startFakeStarapi(options = {}) {
         }
         await new Promise((resolve) => setTimeout(resolve, latencyMs))
         if (foreign) return notFound()
+        const remaining = flakyLeft.get(modelId) ?? 0
+        if (remaining > 0) {
+          // An overloaded gateway: a bare 500 and no body, exactly once per count.
+          // Counted per model call, not per request, so a retry of the same probe succeeds.
+          flakyLeft.set(modelId, remaining - 1)
+          res.writeHead(500)
+          return res.end()
+        }
+        const refusedEffort = body?.reasoning?.effort
+        if (refusedEffort !== undefined && (flakyEfforts[modelId] ?? []).includes(refusedEffort)) {
+          res.writeHead(503)
+          return res.end()
+        }
         if (mode === 'down') {
           return group === 'claude'
             ? anthropicError(res, 503, 'gateway_failover_exhausted', 'All compatible upstream candidates were exhausted')
@@ -275,7 +295,15 @@ export async function startFakeStarapi(options = {}) {
         if (group === 'rc') {
           const model = RC_MODELS[modelId]
           if (model === undefined || model.removed) return notFound()
-          if (model.down) return responsesError(res, 503, 'server_error', 'All available accounts exhausted')
+          if (model.down) {
+            // An overloaded edge answers 503 with no body at all; the plugin must
+            // still be able to say why the model went unverified.
+            if (options.rcBareOutage) {
+              res.writeHead(503)
+              return res.end()
+            }
+            return responsesError(res, 503, 'server_error', 'All available accounts exhausted')
+          }
           const effort = body?.reasoning?.effort
           if (effort !== undefined && !CODEX_EFFORTS.has(effort)) return responsesError(res, 400, 'invalid_request_error', `Unsupported reasoning effort "${effort}"`)
           if (Number(body?.max_output_tokens) > model.cap) return responsesError(res, 400, 'invalid_request_error', 'max_output_tokens is too large')
@@ -342,6 +370,9 @@ export async function startFakeStarapi(options = {}) {
     stats,
     setMode(next) {
       mode = next
+    },
+    failList(next = true) {
+      listFails = next
     },
     close: () => new Promise((resolve) => server.close(() => resolve())),
   }

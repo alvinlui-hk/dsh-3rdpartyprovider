@@ -33,10 +33,10 @@ import {
 import { CLAUDE_KEY, CODEX_KEY, RC_KEY, startFakeStarapi } from './fake-starapi.mjs'
 
 /** The slice of a DSH Host context the plugin touches. */
-function stubContext(initialProviders = {}, { storedKeys = {} } = {}) {
+function stubContext(initialProviders = {}, { storedKeys = {}, reloadOnEdit = false } = {}) {
   const routes = new Map()
   const refs = new Map(Object.entries(storedKeys))
-  const entry = { options: { id: 'llm-pi-ai', config: { providers: structuredClone(initialProviders) } } }
+  let entry = { options: { id: 'llm-pi-ai', config: { providers: structuredClone(initialProviders) } } }
   const logs = []
   const ctx = {
     logger: { warn: (...args) => logs.push(args.join(' ')) },
@@ -62,6 +62,16 @@ function stubContext(initialProviders = {}, { storedKeys = {} } = {}) {
         return {
           entries: () => [entry],
           edit: async (target, change) => {
+            if (reloadOnEdit) {
+              // What configEditor.edit does: reload the profile, which replaces the
+              // entry object, then refuse to write through the object it was handed.
+              // Long enough that the two groups' writes overlap.
+              await new Promise((resolve) => setTimeout(resolve, 500))
+              if (target !== entry) throw new Error('Configuration entry is no longer available')
+              const next = { options: { id: 'llm-pi-ai', config: change(structuredClone(target.options.config), {}) } }
+              entry = next
+              return
+            }
             target.options.config = change(structuredClone(target.options.config), {})
           },
         }
@@ -527,6 +537,100 @@ test('RC connect with a Codex key is refused (that key lists no claude model)', 
   assert.equal(state.body.job.error, 'NO_MODELS')
   assert.equal(dsh.refs.size, 0)
   assert.equal(dsh.provider('rc-claude'), undefined)
+})
+
+test('RC connect records a reason for every unverified model, including a body-less 503', async () => {
+  // A 503 with no body is what an overloaded gateway actually returns; the card
+  // prints the first reason it finds, so a blank one becomes a literal "—".
+  const dsh = stubContext()
+  const bare = await startFakeStarapi({ rcBareOutage: true })
+  try {
+    apply(dsh.ctx, { roots: { 'rc-claude': bare.url } })
+    const state = await dsh.connect('rc-claude', { key: RC_KEY })
+    assert.equal(state.body.job.phase, 'done', JSON.stringify(state.body.job))
+    const blank = state.body.report.models.filter((model) => !model.verified && model.reason === undefined)
+    assert.deepEqual(blank.map((model) => model.id), [], 'every unverified model must carry a reason')
+  } finally {
+    await bare.close()
+  }
+})
+
+test('RC connect names the probe that failed when the model itself answers', async () => {
+  // Availability succeeds, then the xhigh probe is a bare 503. That used to
+  // leave verified:false with no reason, which the card prints as "—".
+  const dsh = stubContext()
+  const partial = await startFakeStarapi({ flakyEfforts: { 'claude-sonnet-5-5': ['xhigh'] } })
+  try {
+    apply(dsh.ctx, { roots: { 'rc-claude': partial.url } })
+    const state = await dsh.connect('rc-claude', { key: RC_KEY })
+    assert.equal(state.body.job.phase, 'done', JSON.stringify(state.body.job))
+    const model = state.body.report.models.find((entry) => entry.id === 'claude-sonnet-5-5')
+    assert.equal(model.verified, false, JSON.stringify(model))
+    assert.equal(model.reason, 'xhigh unconfirmed', JSON.stringify(model))
+  } finally {
+    await partial.close()
+  }
+})
+
+test('a probe that the gateway refuses to answer is retried before it is called an outage', async () => {
+  // StarAPI answers an overloaded probe with a bare 500, and the same model
+  // succeeds a moment later. One such answer must not mark the model unverified.
+  const dsh = stubContext()
+  const flaky = await startFakeStarapi({ flaky: { 'claude-opus-4-8': 1 } })
+  try {
+    apply(dsh.ctx, { baseURL: flaky.url })
+    const state = await dsh.connect('claude', { key: CLAUDE_KEY })
+    assert.equal(state.body.job.phase, 'done', JSON.stringify(state.body.job))
+    const model = state.body.report.models.find((entry) => entry.id === 'claude-opus-4-8')
+    assert.equal(model.verified, true, JSON.stringify(model))
+    const sent = flaky.requests.filter((request) => request.body?.model === 'claude-opus-4-8')
+    assert.ok(sent.length > 1, 'the refused probe was not retried')
+  } finally {
+    await flaky.close()
+  }
+})
+
+test('two groups finishing together both keep what they wrote', async () => {
+  // configEditor.edit reloads the profile and then rejects a stale entry, so a
+  // second write started while the first reload runs must wait for it.
+  const dsh = stubContext({}, { reloadOnEdit: true })
+  apply(dsh.ctx, { baseURL: fake.url, roots: { 'rc-claude': fake.url } })
+  const [claude, rc] = await Promise.all([dsh.connect('claude', { key: CLAUDE_KEY }), dsh.connect('rc-claude', { key: RC_KEY })])
+  assert.equal(claude.body.job.phase, 'done', JSON.stringify(claude.body.job))
+  assert.equal(rc.body.job.phase, 'done', JSON.stringify(rc.body.job))
+  assert.ok(dsh.provider('claude') !== undefined, 'the claude profile was lost')
+  assert.ok(dsh.provider('rc-claude') !== undefined, 'the rc profile was lost')
+})
+
+test('removing one group while another is saving does not lose either write', async () => {
+  // Remove goes through the same editor as connect, so it has the same stale-entry race.
+  const dsh = stubContext({}, { reloadOnEdit: true })
+  apply(dsh.ctx, { baseURL: fake.url, roots: { 'rc-claude': fake.url } })
+  await dsh.connect('claude', { key: CLAUDE_KEY })
+  const [rc, removed] = await Promise.all([
+    dsh.connect('rc-claude', { key: RC_KEY }),
+    dsh.call('claude', 'remove', 'POST', { forgetKey: false }),
+  ])
+  assert.equal(rc.body.job.phase, 'done', JSON.stringify(rc.body.job))
+  assert.equal(removed.body.configured, false, JSON.stringify(removed.body))
+  assert.equal(dsh.provider('claude'), undefined, 'the removed profile came back')
+  assert.ok(dsh.provider('rc-claude') !== undefined, 'the rc profile was lost to the overlapping remove')
+})
+
+test('a failed re-detect clears the previous run notes', async () => {
+  const dsh = stubContext()
+  const flaky = await startFakeStarapi()
+  try {
+    apply(dsh.ctx, { baseURL: flaky.url })
+    const first = await dsh.connect('claude', { key: CLAUDE_KEY })
+    assert.ok(first.body.report.models.length > 0)
+    flaky.failList()
+    const failed = await dsh.connect('claude', {})
+    assert.equal(failed.body.job.phase, 'failed')
+    assert.equal(failed.body.report, null, 'a failed re-detect kept the previous report')
+  } finally {
+    await flaky.close()
+  }
 })
 
 test('RC remove leaves StarAPI providers and keys intact', async () => {

@@ -391,13 +391,18 @@ async function listModels(family, root, key) {
   return { ids: chat, skipped: ids.filter((id) => family.isListedNonChat(id)) }
 }
 
-/** A probe request with one 429 retry, inside the run's time budget. */
+/**
+ * A probe request with one retry, inside the run's time budget.
+ * 429 is a concurrency limit; a bare 5xx or a dropped connection is the same
+ * kind of blip — one of them must not mark a working model unverified.
+ */
 function asker(root, key, path, style, deadline) {
+  const transient = (result) => result.status === 429 || result.status === 0 || result.status >= 500
   return async (body) => {
     const left = deadline - Date.now()
     if (left < 2_000) return { status: 0, errorType: 'budget', message: 'probe budget exhausted' }
     let result = await starapi(root, path, { key, body, style, timeoutMs: Math.min(PROBE_TIMEOUT_MS, left) })
-    if (result.status === 429 && deadline - Date.now() > RETRY_DELAY_MS + 2_000) {
+    if (transient(result) && deadline - Date.now() > RETRY_DELAY_MS + 2_000) {
       await sleep(RETRY_DELAY_MS)
       result = await starapi(root, path, { key, body, style, timeoutMs: Math.min(PROBE_TIMEOUT_MS, deadline - Date.now()) })
     }
@@ -425,7 +430,8 @@ async function probeClaude(root, key, id, deadline) {
   const availability = classifyClaudeAvailability(await ask({ model: id, max_tokens: 16, thinking: { type: 'disabled' }, messages: ping }))
   if (availability.state !== 'ok') return { id, ...availability, verified: false }
   const cap = await largestCap(async (value) => (await ask({ model: id, max_tokens: value, messages: ping })).status === 200)
-  return { id, state: 'ok', off: availability.off, cap, verified: cap !== undefined }
+  // Reachable but the cap probes never settled: keep the fallback, and say why it is unverified.
+  return { id, state: 'ok', off: availability.off, cap, verified: cap !== undefined, ...(cap === undefined ? { reason: 'output cap unconfirmed' } : {}) }
 }
 
 /** OpenAI Responses probe (Codex + RC Claude): availability at `low`, whether `xhigh`/`max` are accepted, then the output cap. */
@@ -437,7 +443,16 @@ async function probeResponses(root, key, id, deadline, classify) {
   const xhigh = classifyEffort(await ask(body('xhigh')))
   const max = classifyEffort(await ask(body('max')))
   const cap = await largestCap(async (value) => (await ask(body('low', value))).status === 200)
-  return { id, state: 'ok', xhigh, max, cap, verified: cap !== undefined && xhigh !== undefined && max !== undefined }
+  const verified = cap !== undefined && xhigh !== undefined && max !== undefined
+  // The model answers, but a later probe did not: name which one, so the card never prints a blank reason.
+  const reason = !verified
+    ? xhigh === undefined
+      ? 'xhigh unconfirmed'
+      : max === undefined
+        ? 'max unconfirmed'
+        : 'output cap unconfirmed'
+    : undefined
+  return { id, state: 'ok', xhigh, max, cap, verified, ...(reason === undefined ? {} : { reason }) }
 }
 
 // ---------------------------------------------------------------------------
@@ -576,9 +591,29 @@ export function apply(ctx, config) {
     return typeof hit?.value === 'string' && hit.value.length > 0 ? hit.value : undefined
   }
 
+  /**
+   * One profile edit, re-reading the entry each try.
+   * configEditor.edit reloads the profile and then refuses the entry object it
+   * was handed, so a write that overlaps another group's write has to start again.
+   */
+  const editProviders = async (change) => {
+    let last
+    for (let attempt = 0; attempt < 4; attempt++) {
+      const { editor, entry } = piAi()
+      try {
+        await editor.edit(entry, change)
+        return
+      } catch (error) {
+        last = error
+        if (!/no longer available|changed during reload/i.test(String(error?.message ?? error))) throw error
+        await sleep(150 * (attempt + 1))
+      }
+    }
+    throw last
+  }
+
   const writeProvider = async (family, models) => {
-    const { editor, entry } = piAi()
-    await editor.edit(entry, (current) => {
+    await editProviders((current) => {
       const providers = { ...(current.providers ?? {}) }
       providers[family.providerId] = buildProviderProfile(family, providers[family.providerId], roots[family.id], models)
       return { ...current, providers }
@@ -586,9 +621,8 @@ export function apply(ctx, config) {
   }
 
   const removeProvider = async (family) => {
-    const { editor, entry } = piAi()
     if (currentProfile(family) === undefined) return false
-    await editor.edit(entry, (current) => {
+    await editProviders((current) => {
       const providers = { ...(current.providers ?? {}) }
       delete providers[family.providerId]
       return { ...current, providers }
@@ -780,6 +814,8 @@ return json(200, { ok: true, ...(await run(request)) })
       if (jobs[family.id].running) throw new StarapiError('BUSY', 'a connect run is already in progress')
       const typedKey = body.key === undefined || body.key === null || body.key === '' ? undefined : normalizeKey(body.key)
       jobs[family.id] = { ...idleJob(), running: true, phase: 'starting' }
+      // A failed re-detect must not leave the previous run's notes beside the error.
+      reports[family.id] = null
       void connect(family, typedKey)
       return snapshot(family)
     })

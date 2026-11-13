@@ -47,12 +47,12 @@ claude-fable-5-2 requires adaptive thinking; omit thinking or use thinking.type=
 
 ## 安裝
 
-需要 DeepSeek Harness `0.2.2-rc.1` 或以上，同有 Web 介面嘅 profile（Desktop 或 `dsh web`）。將 `alvinlui-hk-dsh-starapi-1.2.0.tgz` 抄去嗰部電腦，然後揀一個方法。
+需要 DeepSeek Harness `0.2.2-rc.1` 或以上，同有 Web 介面嘅 profile（Desktop 或 `dsh web`）。將 `alvinlui-hk-dsh-starapi-1.2.1.tgz` 抄去嗰部電腦，然後揀一個方法。
 
 ### 方法一：喺 DSH 介面安裝（唔使開 terminal）
 
 1. 開 DSH，去左邊 **插件** 頁面，㩒右上角 **添加插件**。
-2. 喺「包名或地址」貼入 `.tgz` 嘅**絕對路徑**，例如 `C:\Users\you\Downloads\alvinlui-hk-dsh-starapi-1.2.0.tgz`。
+2. 喺「包名或地址」貼入 `.tgz` 嘅**絕對路徑**，例如 `C:\Users\you\Downloads\alvinlui-hk-dsh-starapi-1.2.1.tgz`。
 3. 㩒 **安装**，再㩒 **立即启用**。
 
 裝完唔好移動或者刪除個 `.tgz`：profile 記住嘅係呢個路徑，之後重裝依賴會再讀佢。
@@ -60,7 +60,7 @@ claude-fable-5-2 requires adaptive thinking; omit thinking or use thinking.type=
 ### 方法二：叫 DSH 入面嘅 Agent 安裝
 
 ```text
-將 C:\Users\you\Downloads\alvinlui-hk-dsh-starapi-1.2.0.tgz 作為 bundle 安裝到當前 profile 並啟用。
+將 C:\Users\you\Downloads\alvinlui-hk-dsh-starapi-1.2.1.tgz 作為 bundle 安裝到當前 profile 並啟用。
 ```
 
 ### 方法三：命令行
@@ -68,7 +68,7 @@ claude-fable-5-2 requires adaptive thinking; omit thinking or use thinking.type=
 Desktop 版要先完全退出 DSH：
 
 ```powershell
-& "$env:LOCALAPPDATA\Programs\DeepSeek Harness\resources\runtime\cli\bin\dsh.cmd" plugin --profile desktop add "C:\Users\you\Downloads\alvinlui-hk-dsh-starapi-1.2.0.tgz"
+& "$env:LOCALAPPDATA\Programs\DeepSeek Harness\resources\runtime\cli\bin\dsh.cmd" plugin --profile desktop add "C:\Users\you\Downloads\alvinlui-hk-dsh-starapi-1.2.1.tgz"
 ```
 
 `dsh web` 用 `--profile web`。
@@ -92,7 +92,7 @@ Desktop 版要先完全退出 DSH：
 
 - **偵測會用少量額度。** 每個模型大約 2 至 6 個極短請求。
 - **StarAPI 兩條 Key 共用一個錢包**（兩張 StarAPI 卡餘額一樣）；**RC（api.site）係獨立錢包**，餘額分開。
-- **中轉服務壞咗嘅時候都加得到，但未經實測。** 如果偵測嗰陣某組模型全部回 503，插件會用內置嘅已知設定照加，並喺卡片標明「未驗證」；等服務回復之後㩒「重新偵測模型」。「未驗證」標記同「已略過」清單只記喺記憶體，重啟 DSH 之後唔再顯示（設定本身唔受影響）。
+- **中轉服務壞咗嘅時候都加得到，但未經實測。** 如果偵測嗰陣某組模型全部回 503，插件會用內置嘅已知設定照加，並喺卡片標明「未驗證」同原因；等服務回復之後㩒「重新偵測模型」。單一次 5xx 或者斷線會重試一次，唔會因為一次抖動就標「未驗證」。「未驗證」標記同「已略過」清單只記喺記憶體，重啟 DSH 之後唔再顯示（設定本身唔受影響）。
 - **中轉服務本身嘅故障插件解決唔到。** `503 All compatible upstream candidates were exhausted` / `All available accounts exhausted` 係上游冇可用帳號，同設定無關；卡片嘅「測試」掣會原文顯示呢類錯誤。
 - **Codex 同 RC 都冇「關思考」。** 兩者都會照收 `none` 但照樣思考，所以插件唔提供呢個級別；唔揀級別就係模型自己嘅預設。
 - **RC 嘅 `claude-fable-5-2`**：渠道更新後可能已經冇咗（404），插件會略過佢。如果你嘅 `agent-default-model` 預設係佢，要另外轉去一個用到嘅模型——插件唔會自動改你嘅預設模型設定。

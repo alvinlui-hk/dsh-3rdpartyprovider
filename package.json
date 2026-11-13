@@ -1,6 +1,6 @@
 {
   "name": "@alvinlui-hk/dsh-starapi",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "type": "module",
   "description": "Set up relay-gateway Claude/GPT providers in DeepSeek Harness (StarAPI Claude, StarAPI Codex, RC Claude) with thinking levels measured per model, from cards on Settings → Models.",
   "license": "MIT",
