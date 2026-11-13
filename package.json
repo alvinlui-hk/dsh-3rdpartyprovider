@@ -1,0 +1,53 @@
+{
+  "name": "@alvinlui-hk/dsh-starapi",
+  "version": "1.2.0",
+  "type": "module",
+  "description": "Set up relay-gateway Claude/GPT providers in DeepSeek Harness (StarAPI Claude, StarAPI Codex, RC Claude) with thinking levels measured per model, from cards on Settings → Models.",
+  "license": "MIT",
+  "keywords": [
+    "deepseek-harness",
+    "dsh",
+    "dsh-plugin",
+    "starapi",
+    "claude",
+    "codex",
+    "gpt",
+    "rc",
+    "llm",
+    "provider"
+  ],
+  "engines": {
+    "dsh": ">=0.2.2-rc.1"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "cordis.patch.yml",
+    "locale/*.json",
+    "icon.svg",
+    "README.md",
+    "LICENSE"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-settings-models",
+        "@deepseek-ai/dsh-client-locale"
+      ]
+    }
+  }
+}
