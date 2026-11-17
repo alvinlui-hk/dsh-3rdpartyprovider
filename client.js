@@ -7,7 +7,7 @@ window.__ModuleLoader__.load({
     const EFFORT_ORDER = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max']
 
     const zh = {
-      zoneTitle: '中轉模型供應商（StarAPI / RC）',
+      zoneTitle: '第三方模型供應商',
       titleClaude: 'StarAPI Claude',
       titleCodex: 'StarAPI Codex',
       titleRc: 'RC Claude',
@@ -83,7 +83,7 @@ window.__ModuleLoader__.load({
     }
 
     const en = {
-      zoneTitle: 'Relay model providers (StarAPI / RC)',
+      zoneTitle: 'Third-party model providers',
       titleClaude: 'StarAPI Claude',
       titleCodex: 'StarAPI Codex',
       titleRc: 'RC Claude',

@@ -1,8 +1,8 @@
 {
   "name": "@alvinlui-hk/dsh-starapi",
-  "version": "1.3.0",
+  "version": "1.3.1",
   "type": "module",
-  "description": "Set up relay-gateway Claude/GPT providers in DeepSeek Harness (StarAPI Claude, StarAPI Codex, RC Claude, RC Codex) with thinking levels measured per model, from cards on Settings → Models.",
+  "description": "3rdPartyProvider for DSH: set up third-party model relays (StarAPI Claude, StarAPI Codex, RC Claude, RC Codex) with automatic model detection and per-model thinking levels in Settings → Models.",
   "license": "MIT",
   "keywords": [
     "deepseek-harness",

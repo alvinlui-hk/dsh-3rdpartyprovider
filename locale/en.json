@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "StarAPI / RC providers",
-    "description": "Paste a key once per relay group (StarAPI Claude, StarAPI Codex, RC Claude, RC Codex) and get its models as working providers, with thinking levels measured per model."
+    "title": "3rdPartyProvider for DSH",
+    "description": "Set up third-party model relays from Settings → Models → Third-party model providers. Supports StarAPI Claude, StarAPI Codex, RC Claude and RC Codex, with automatic model detection and per-model thinking levels. Detection uses a small amount of relay credit; upstream outages may leave models unverified."
   }
 }

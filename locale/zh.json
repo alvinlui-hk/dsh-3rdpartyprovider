@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "StarAPI / RC 供應商",
-    "description": "每個中轉分組貼一次 Key（StarAPI Claude、StarAPI Codex、RC Claude、RC Codex），就將佢嘅模型加做可用嘅供應商，思考級別逐個模型實測設定。"
+    "title": "3rdPartyProvider for DSH",
+    "description": "一站式設定第三方模型中轉服務：去「設定 → 模型 → 第三方模型供應商」貼上對應分組嘅 Key，自動偵測模型同逐個模型設定思考級別。目前支援 StarAPI Claude、StarAPI Codex、RC Claude 同 RC Codex。偵測會用少量額度；上游故障時模型可能標為未驗證。"
   }
 }

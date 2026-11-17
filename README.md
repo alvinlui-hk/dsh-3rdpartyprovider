@@ -1,10 +1,12 @@
-# StarAPI / RC providers for DeepSeek Harness
+# 3rdPartyProvider for DSH
 
 喺 DeepSeek Harness（DSH）一次過設定四個中轉（relay）供應商：**StarAPI Claude**、**StarAPI Codex（GPT）**、**RC Claude**、**RC Codex（GPT）**（RC 即係 api.site）。裝好之後喺 **設定 → 模型** 每個分組貼一次 API Key，插件會自動偵測你個帳號用得嘅模型，並寫好可以正常使用（包括思考模式）嘅供應商 `starapi-claude`、`starapi-codex`、`rc-claude`、`rc-codex`。
 
 非官方插件，同 StarAPI、api.site、OpenAI、Anthropic、DeepSeek 冇關係。
 
-> 個 package 名仍然係 `dsh-starapi`（歷史原因，保持安裝路徑穩定），但而家涵蓋 StarAPI 同 RC 兩個中轉服務。
+> 由 1.3.1 起，插件顯示名改為 **3rdPartyProvider for DSH**（原名 StarAPI / RC providers）。今次只改品牌，唔改供應商功能；目前支援上面四個分組，唔係通用嘅任意供應商設定器。
+>
+> 為咗直接升級，package 名 `@alvinlui-hk/dsh-starapi`、插件 ID `starapi`、`/api/starapi/` 後台路徑、四個供應商 ID 同憑證 Key 名全部保留。現有設定同已儲存嘅 Key 唔使搬，亦唔使移除舊插件再裝。GitHub repo 暫時保留原名。
 
 ## 點解需要呢個插件
 
@@ -55,12 +57,12 @@ claude-fable-5-2 requires adaptive thinking; omit thinking or use thinking.type=
 
 ## 安裝
 
-需要 DeepSeek Harness `0.2.2-rc.1` 或以上，同有 Web 介面嘅 profile（Desktop 或 `dsh web`）。將 `alvinlui-hk-dsh-starapi-1.3.0.tgz` 抄去嗰部電腦，然後揀一個方法。
+需要 DeepSeek Harness `0.2.2-rc.1` 或以上，同有 Web 介面嘅 profile（Desktop 或 `dsh web`）。將 `alvinlui-hk-dsh-starapi-1.3.1.tgz` 抄去嗰部電腦，然後揀一個方法。
 
 ### 方法一：喺 DSH 介面安裝（唔使開 terminal）
 
 1. 開 DSH，去左邊 **插件** 頁面，㩒右上角 **添加插件**。
-2. 喺「包名或地址」貼入 `.tgz` 嘅**絕對路徑**，例如 `C:\Users\you\Downloads\alvinlui-hk-dsh-starapi-1.3.0.tgz`。
+2. 喺「包名或地址」貼入 `.tgz` 嘅**絕對路徑**，例如 `C:\Users\you\Downloads\alvinlui-hk-dsh-starapi-1.3.1.tgz`。
 3. 㩒 **安装**，再㩒 **立即启用**。
 
 裝完唔好移動或者刪除個 `.tgz`：profile 記住嘅係呢個路徑，之後重裝依賴會再讀佢。
@@ -68,7 +70,7 @@ claude-fable-5-2 requires adaptive thinking; omit thinking or use thinking.type=
 ### 方法二：叫 DSH 入面嘅 Agent 安裝
 
 ```text
-將 C:\Users\you\Downloads\alvinlui-hk-dsh-starapi-1.3.0.tgz 作為 bundle 安裝到當前 profile 並啟用。
+將 C:\Users\you\Downloads\alvinlui-hk-dsh-starapi-1.3.1.tgz 作為 bundle 安裝到當前 profile 並啟用。
 ```
 
 ### 方法三：命令行
@@ -76,14 +78,14 @@ claude-fable-5-2 requires adaptive thinking; omit thinking or use thinking.type=
 Desktop 版要先完全退出 DSH：
 
 ```powershell
-& "$env:LOCALAPPDATA\Programs\DeepSeek Harness\resources\runtime\cli\bin\dsh.cmd" plugin --profile desktop add "C:\Users\you\Downloads\alvinlui-hk-dsh-starapi-1.3.0.tgz"
+& "$env:LOCALAPPDATA\Programs\DeepSeek Harness\resources\runtime\cli\bin\dsh.cmd" plugin --profile desktop add "C:\Users\you\Downloads\alvinlui-hk-dsh-starapi-1.3.1.tgz"
 ```
 
 `dsh web` 用 `--profile web`。
 
 ## 使用
 
-1. 去 **設定 → 模型**，拉到最底搵 **中轉模型供應商（StarAPI / RC）** 區塊，有四張卡：StarAPI Claude、StarAPI Codex、RC Claude、RC Codex。
+1. 去 **設定 → 模型**，拉到最底搵 **第三方模型供應商** 區塊，有四張卡：StarAPI Claude、StarAPI Codex、RC Claude、RC Codex。
 2. 每張卡貼對應分組嘅 API Key，㩒 **連接**。插件會驗證 Key、逐個測試模型（大約半分鐘至一分鐘一組），然後寫入設定。
 3. 卡片變成「已連接」之後，可以用 **測試** 掣揀一個模型同思考級別實際調用一次。
 4. 喺對話輸入框嘅模型選單揀對應供應商下面嘅模型，再揀「推理等級」。
@@ -130,7 +132,7 @@ Desktop 版要先完全退出 DSH：
 ## 開發
 
 ```powershell
-node --test test/          # Host 半邊嘅單元測試，用本機假中轉伺服器（四組）
+node --test test/*.test.mjs  # Host 同品牌相容性測試，用本機假中轉伺服器（四組）
 node test/fake-starapi.mjs 47811   # 單獨開假伺服器，配合上面嘅位址設定做手動測試
 npm pack                   # 打包
 ```
