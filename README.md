@@ -6,7 +6,7 @@
 
 > 由 1.3.1 起，插件顯示名改為 **3rdPartyProvider for DSH**（原名 StarAPI / RC providers）。今次只改品牌，唔改供應商功能；目前支援上面四個分組，唔係通用嘅任意供應商設定器。
 >
-> 為咗直接升級，package 名 `@alvinlui-hk/dsh-starapi`、插件 ID `starapi`、`/api/starapi/` 後台路徑、四個供應商 ID 同憑證 Key 名全部保留。現有設定同已儲存嘅 Key 唔使搬，亦唔使移除舊插件再裝。GitHub repo 暫時保留原名。
+> 為咗直接升級，package 名 `@alvinlui-hk/dsh-starapi`、插件 ID `starapi`、`/api/starapi/` 後台路徑、四個供應商 ID 同憑證 Key 名全部保留。現有設定同已儲存嘅 Key 唔使搬，亦唔使移除舊插件再裝。GitHub repo 已更名為 [`alvinlui-hk/dsh-3rdpartyprovider`](https://github.com/alvinlui-hk/dsh-3rdpartyprovider)；舊網址由 GitHub 轉址，建議新安裝改用新網址。已發布嘅 v1.3.1 tag 保持不變，當中提及 repo 暫時保留原名嘅文字係更名前嘅歷史說明。
 
 ## 點解需要呢個插件
 
