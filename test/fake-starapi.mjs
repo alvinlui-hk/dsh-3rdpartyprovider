@@ -18,6 +18,10 @@
  * - streaming follows the Responses event grammar pi-ai parses, including
  *   `function_call` items for tool calls.
  *
+ * RC Codex group (`/v1/responses`, api.site): answers 200 to any effort name
+ * and echoes the level it ran; `none` is real on some models and `low` on
+ * others; shares the RC Claude wallet.
+ *
  * Shared: a burst is answered 429 "Concurrency limit exceeded"; a key only
  * sees its own group's models, and a model of the other group is 404
  * `model_not_found`; `mode: 'down'` answers every model call with 503 while
@@ -30,6 +34,7 @@ import { createServer } from 'node:http'
 export const CLAUDE_KEY = 'sk-fake-claude-key-0123456789'
 export const CODEX_KEY = 'sk-fake-codex-key-0123456789'
 export const RC_KEY = 'sk-fake-rc-key-0123456789'
+export const RC_CODEX_KEY = 'sk-fake-rc-codex-key-0123456789'
 
 const CLAUDE_MODELS = {
   'claude-opus-4-8': { adaptiveOnly: false, cap: 128_000 },
@@ -68,6 +73,31 @@ const RC_MODELS = {
   // Listed, but the upstream accounts are exhausted: 503.
   'claude-fable-5-1': { down: true },
   'claude-fable-5': { down: true },
+}
+
+// RC (api.site) Codex group, as measured on 2026-11-17: shares the RC Claude
+// key's wallet; answers 200 to any effort name and echoes the level it ran
+// (an unknown name runs as `high`); `none` is real on some models and runs as
+// `low` on others; `minimal` is a 400 "Upstream request failed" on some.
+const RC_CODEX_MODELS = {
+  'gpt-6.1-sol': { off: 'fake', cap: 128_000 },
+  'gpt-6-astra': { off: 'fake', cap: 128_000 },
+  'gpt-6-sol': { off: 'real', cap: 128_000, minimal400: true },
+  'gpt-5.6-sol': { off: 'real', cap: 128_000, minimal400: true },
+  // Listed, but Codex's review helper: not a chat route.
+  'codex-auto-review': { off: 'real', cap: 128_000, maxRunsAs: 'xhigh' },
+  // Not measured: the real terra runs `max` as `max`. Capped here so the tests
+  // have a chat model whose `max` runs as `xhigh`, as codex-auto-review really does.
+  'gpt-6.1-terra': { off: 'real', cap: 128_000, maxRunsAs: 'xhigh' },
+}
+
+/** The effort an RC Codex model actually runs for a requested one. */
+function rcCodexRuns(model, requested) {
+  if (requested === undefined) return 'medium'
+  if (requested === 'none' || requested === 'minimal') return model.off === 'real' && requested === 'none' ? 'none' : 'low'
+  if (requested === 'max' && model.maxRunsAs) return model.maxRunsAs
+  if (['low', 'medium', 'high', 'xhigh', 'max'].includes(requested)) return requested
+  return 'high'
 }
 
 const send = (res, status, body) => {
@@ -191,25 +221,31 @@ export async function startFakeStarapi(options = {}) {
     }
     requests.push({ method: req.method, path: url.pathname, body, headers: req.headers })
 
-    if (key !== CLAUDE_KEY && key !== CODEX_KEY && key !== RC_KEY) return send(res, 401, { code: 'INVALID_API_KEY', message: 'Invalid API key' })
-    const group = key === CLAUDE_KEY ? 'claude' : key === CODEX_KEY ? 'codex' : 'rc'
+    if (key !== CLAUDE_KEY && key !== CODEX_KEY && key !== RC_KEY && key !== RC_CODEX_KEY) return send(res, 401, { code: 'INVALID_API_KEY', message: 'Invalid API key' })
+    const group = key === CLAUDE_KEY ? 'claude' : key === CODEX_KEY ? 'codex' : key === RC_KEY ? 'rc' : 'rc-codex'
 
     if (req.method === 'GET' && url.pathname === '/v1/models') {
       if (listFails) return send(res, 500, { error: { message: 'model list unavailable', type: 'server_error' } })
-      const ids = group === 'claude' ? Object.keys(CLAUDE_MODELS) : group === 'codex' ? Object.keys(CODEX_MODELS) : Object.keys(RC_MODELS)
+      const ids =
+        group === 'claude' ? Object.keys(CLAUDE_MODELS) : group === 'codex' ? Object.keys(CODEX_MODELS) : group === 'rc' ? Object.keys(RC_MODELS) : Object.keys(RC_CODEX_MODELS)
       return send(res, 200, { data: ids.map((id) => ({ id, object: 'model', type: 'model', display_name: id, created_at: '2024-01-01T00:00:00Z' })) })
     }
 
     if (req.method === 'GET' && url.pathname === '/v1/usage') {
-      return send(res, 200, { balance: 12.345, remaining: 12.345, unit: 'USD', usage: { today: { requests: 7, total_tokens: 4200 } } })
+      // The two RC keys share one api.site wallet; StarAPI's two keys share another.
+      const balance = group === 'rc' || group === 'rc-codex' ? 136.25 : 12.345
+      return send(res, 200, { balance, remaining: balance, unit: 'USD', usage: { today: { requests: 7, total_tokens: 4200 } } })
     }
 
     const modelId = body?.model
-    const foreign = (group === 'claude' && !String(modelId ?? '').startsWith('claude-')) || (group === 'codex' && !/^(gpt-|o\d|codex)/i.test(String(modelId ?? ''))) || (group === 'rc' && !String(modelId ?? '').startsWith('claude-'))
+    const foreign =
+      (group === 'claude' && !String(modelId ?? '').startsWith('claude-')) ||
+      ((group === 'codex' || group === 'rc-codex') && !/^(gpt-|o\d|codex)/i.test(String(modelId ?? ''))) ||
+      (group === 'rc' && !String(modelId ?? '').startsWith('claude-'))
     const notFound = () =>
       group === 'claude'
         ? anthropicError(res, 404, 'model_not_found', `Model "${modelId}" is not supported by any configured account in this group`)
-        : group === 'rc'
+        : group === 'rc' || group === 'rc-codex'
           ? send(res, 404, { error: 'model not found' })
           : responsesError(res, 404, 'model_not_found', `Model "${modelId}" is not supported by any configured account in this group`)
 
@@ -319,6 +355,31 @@ export async function startFakeStarapi(options = {}) {
             model: modelId,
             output,
             usage: { input_tokens: 12, output_tokens: 6, total_tokens: 18 },
+          })
+        }
+
+        // RC Codex group: answers any effort name with 200 and echoes what it ran.
+        if (group === 'rc-codex') {
+          const model = RC_CODEX_MODELS[modelId]
+          if (model === undefined) return notFound()
+          const requested = body?.reasoning?.effort
+          if (requested === 'minimal' && model.minimal400) return responsesError(res, 400, 'upstream_error', 'Upstream request failed')
+          if (Number(body?.max_output_tokens) > model.cap) return responsesError(res, 400, 'invalid_request_error', 'max_output_tokens is too large')
+          const ran = rcCodexRuns(model, requested)
+          const tool = wantsTool(inputText(body))
+          if (body?.stream === true) return streamResponses(res, { model: modelId, effort: ran === 'none' ? undefined : ran, tool })
+          const reasoningTokens = ran === 'none' ? 0 : 4
+          const output = tool
+            ? [{ type: 'function_call', id: 'fc_fake', call_id: 'call_fake', name: 'get_weather', arguments: '{"city":"Tokyo"}' }]
+            : [{ type: 'message', id: 'msg_fake', role: 'assistant', content: [{ type: 'output_text', text: 'pong' }] }]
+          return send(res, 200, {
+            id: 'resp_fake',
+            object: 'response',
+            status: 'completed',
+            model: modelId,
+            reasoning: { effort: ran, summary: null },
+            output,
+            usage: { input_tokens: 12, output_tokens: 6 + reasoningTokens, total_tokens: 18 + reasoningTokens, output_tokens_details: { reasoning_tokens: reasoningTokens } },
           })
         }
 

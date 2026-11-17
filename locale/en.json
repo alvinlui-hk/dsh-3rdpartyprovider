@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "StarAPI / RC providers",
-    "description": "Paste a key once per relay group (StarAPI Claude, StarAPI Codex, RC Claude) and get its models as working providers, with thinking levels measured per model."
+    "description": "Paste a key once per relay group (StarAPI Claude, StarAPI Codex, RC Claude, RC Codex) and get its models as working providers, with thinking levels measured per model."
   }
 }

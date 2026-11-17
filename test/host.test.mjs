@@ -15,7 +15,10 @@ import {
   buildClaudeEntry,
   buildCodexEntry,
   buildRcEntry,
+  buildRcCodexEntry,
   buildProviderProfile,
+  classifyOff,
+  rcCodexRepairReasons,
   classifyClaudeAvailability,
   classifyCodexAvailability,
   classifyRcAvailability,
@@ -30,7 +33,7 @@ import {
   normalizeKey,
   redact,
 } from '../index.js'
-import { CLAUDE_KEY, CODEX_KEY, RC_KEY, startFakeStarapi } from './fake-starapi.mjs'
+import { CLAUDE_KEY, CODEX_KEY, RC_CODEX_KEY, RC_KEY, startFakeStarapi } from './fake-starapi.mjs'
 
 /** The slice of a DSH Host context the plugin touches. */
 function stubContext(initialProviders = {}, { storedKeys = {}, reloadOnEdit = false } = {}) {
@@ -644,4 +647,129 @@ test('RC remove leaves StarAPI providers and keys intact', async () => {
   assert.deepEqual(Object.keys(dsh.providers()).sort(), ['starapi-claude'])
   assert.equal(dsh.refs.has('STARAPI_CLAUDE_API_KEY'), true)
   assert.equal(dsh.refs.has('RC_CLAUDE_API_KEY'), false)
+})
+
+// ---------------------------------------------------------------------------
+// RC Codex (api.site)
+// ---------------------------------------------------------------------------
+
+test('classifyEffort reads the echoed effort: a different echo is a refusal', () => {
+  // api.site answers 200 to everything; the echo says what really ran.
+  assert.equal(classifyEffort({ status: 200, json: { reasoning: { effort: 'max' } } }, 'max'), true)
+  assert.equal(classifyEffort({ status: 200, json: { reasoning: { effort: 'xhigh' } } }, 'max'), false, 'max capped to xhigh is not max')
+  assert.equal(classifyEffort({ status: 200, json: { reasoning: { effort: 'high' } } }, 'bogus'), false)
+  // No echo (StarAPI Codex, RC Claude): status alone, exactly as before.
+  assert.equal(classifyEffort({ status: 200, json: {} }, 'max'), true)
+  assert.equal(classifyEffort({ status: 200 }, 'xhigh'), true)
+})
+
+test('classifyOff: only an echoed none is a real off', () => {
+  assert.equal(classifyOff({ status: 200, json: { reasoning: { effort: 'none' } } }), true)
+  assert.equal(classifyOff({ status: 200, json: { reasoning: { effort: 'low' } } }), false, 'none run as low is a fake off')
+  assert.equal(classifyOff({ status: 200, json: {} }), false, 'no echo proves nothing, so no off')
+  assert.equal(classifyOff({ status: 400 }), false)
+  assert.equal(classifyOff({ status: 503 }), undefined)
+})
+
+test('buildRcCodexEntry: off only where measured real, sent as none', () => {
+  const real = buildRcCodexEntry({ id: 'gpt-6-sol', state: 'ok', off: true, xhigh: true, max: true, cap: 128_000 })
+  assert.deepEqual(Object.keys(real.reasoningEfforts), ['off', 'low', 'medium', 'high', 'xhigh', 'max'])
+  assert.equal(real.reasoningEfforts.off, 'none', 'pi-ai sends the stated wire value, so off must say none')
+  const fake = buildRcCodexEntry({ id: 'gpt-6.1-sol', state: 'ok', off: false, xhigh: true, max: true, cap: 128_000 })
+  assert.ok(!('off' in fake.reasoningEfforts))
+  assert.deepEqual(fake.input, ['text', 'image'])
+  assert.equal(fake.contextWindow, 272_000)
+  // Unprobed: the measured table decides; an unknown model never gets off.
+  assert.equal(buildRcCodexEntry({ id: 'gpt-5.6-sol', state: 'unknown' }).reasoningEfforts.off, 'none')
+  assert.ok(!('off' in buildRcCodexEntry({ id: 'gpt-6-astra', state: 'unknown' }).reasoningEfforts))
+  assert.ok(!('off' in buildRcCodexEntry({ id: 'gpt-9-new', state: 'unknown' }).reasoningEfforts))
+})
+
+test('rcCodexRepairReasons flags a fake off, minimal and missing fields, and passes the hand-made 1.2 setup once fixed', () => {
+  // The setup a user writes by hand: no levels at all, so DSH treats both models as non-reasoning.
+  const bare = { api: 'openai-responses', models: [{ id: 'gpt-6.1-sol' }, { id: 'gpt-6-astra' }] }
+  assert.deepEqual(rcCodexRepairReasons(bare), ['no-levels', 'context'])
+  const fakeOff = { api: 'openai-responses', models: [{ id: 'gpt-6.1-sol', contextWindow: 272_000, reasoningEfforts: { off: 'none', low: 'low' } }] }
+  assert.deepEqual(rcCodexRepairReasons(fakeOff), ['off-fake'])
+  const valuelessOff = { api: 'openai-responses', models: [{ id: 'gpt-6-sol', contextWindow: 272_000, reasoningEfforts: { off: null, low: 'low' } }] }
+  assert.deepEqual(rcCodexRepairReasons(valuelessOff), ['off-fake'], 'off without "none" omits reasoning, which runs the default level')
+  const minimal = { api: 'openai-responses', models: [{ id: 'gpt-6-sol', contextWindow: 272_000, reasoningEfforts: { minimal: 'minimal', low: 'low' } }] }
+  assert.deepEqual(rcCodexRepairReasons(minimal), ['off-fake'])
+  const fine = { api: 'openai-responses', models: [{ id: 'gpt-6-sol', contextWindow: 272_000, reasoningEfforts: { off: 'none', low: 'low', high: 'high' } }] }
+  assert.deepEqual(rcCodexRepairReasons(fine), [])
+})
+
+test('RC Codex connect: real off per model, max cap caught by the echo, review helper skipped', async () => {
+  const dsh = stubContext()
+  apply(dsh.ctx, { roots: { 'rc-codex': fake.url } })
+  const state = await dsh.connect('rc-codex', { key: RC_CODEX_KEY })
+  assert.equal(state.body.job.phase, 'done', JSON.stringify(state.body.job))
+  assert.equal(dsh.refs.get('RC_CODEX_API_KEY'), RC_CODEX_KEY)
+  const profile = dsh.provider('rc-codex')
+  assert.equal(profile.api, 'openai-responses')
+  assert.equal(profile.baseURL, `${fake.url}/v1`)
+  assert.equal(profile.apiKeyEnv, 'RC_CODEX_API_KEY')
+  assert.equal(profile.compat, undefined)
+  const byId = Object.fromEntries(profile.models.map((model) => [model.id, model]))
+  assert.deepEqual(Object.keys(byId), ['gpt-6.1-sol', 'gpt-6-astra', 'gpt-6-sol', 'gpt-5.6-sol', 'gpt-6.1-terra'])
+  assert.deepEqual(state.body.report.skipped, ['codex-auto-review'])
+  // Fake off: none runs as low, so no off is offered.
+  assert.deepEqual(Object.keys(byId['gpt-6.1-sol'].reasoningEfforts), ['low', 'medium', 'high', 'xhigh', 'max'])
+  assert.deepEqual(Object.keys(byId['gpt-6-astra'].reasoningEfforts), ['low', 'medium', 'high', 'xhigh', 'max'])
+  // Real off: sent as none.
+  assert.equal(byId['gpt-6-sol'].reasoningEfforts.off, 'none')
+  assert.equal(byId['gpt-5.6-sol'].reasoningEfforts.off, 'none')
+  // A 200 to max that ran xhigh is not max.
+  assert.ok(!('max' in byId['gpt-6.1-terra'].reasoningEfforts), 'max ran as xhigh, so it must not be offered')
+  assert.ok('xhigh' in byId['gpt-6.1-terra'].reasoningEfforts)
+  for (const model of profile.models) {
+    assert.ok(!('minimal' in model.reasoningEfforts), model.id)
+    assert.equal(model.contextWindow, 272_000, model.id)
+    assert.deepEqual(model.input, ['text', 'image'], model.id)
+  }
+  assert.ok(state.body.report.models.every((model) => model.verified), JSON.stringify(state.body.report.models))
+  assert.equal(state.body.needsRepair, false)
+  assert.ok(!JSON.stringify(dsh.providers()).includes(RC_CODEX_KEY), 'the key never enters the profile')
+})
+
+test('RC Codex takes over a hand-made rc-codex profile and keeps its own fields', async () => {
+  const dsh = stubContext(
+    { 'rc-codex': { displayName: 'My RC Codex', apiKeyEnv: 'RC_CODEX_API_KEY', api: 'openai-responses', baseURL: 'https://api.site/v1', headers: { 'x-team': 'a' }, models: [{ id: 'gpt-6.1-sol' }, { id: 'gpt-6-astra' }] } },
+    { storedKeys: { RC_CODEX_API_KEY: RC_CODEX_KEY } },
+  )
+  apply(dsh.ctx, { roots: { 'rc-codex': fake.url } })
+  const before = await dsh.call('rc-codex', 'state')
+  assert.equal(before.body.needsRepair, true)
+  assert.deepEqual(before.body.repairReasons, ['no-levels', 'context'])
+  const after = await dsh.connect('rc-codex', {})
+  assert.equal(after.body.job.phase, 'done')
+  assert.equal(after.body.needsRepair, false)
+  const profile = dsh.provider('rc-codex')
+  assert.equal(profile.displayName, 'My RC Codex')
+  assert.deepEqual(profile.headers, { 'x-team': 'a' })
+  assert.ok(profile.models.every((model) => model.reasoningEfforts !== undefined))
+})
+
+test('RC Claude and RC Codex report the same wallet; removing one keeps the other', async () => {
+  const dsh = stubContext({}, { storedKeys: { RC_CLAUDE_API_KEY: RC_KEY, RC_CODEX_API_KEY: RC_CODEX_KEY } })
+  apply(dsh.ctx, { roots: { 'rc-claude': fake.url, 'rc-codex': fake.url } })
+  const claude = (await dsh.call('rc-claude', 'usage')).body.usage
+  const codex = (await dsh.call('rc-codex', 'usage')).body.usage
+  assert.equal(claude.balance, codex.balance)
+  await dsh.connect('rc-claude', {})
+  await dsh.connect('rc-codex', {})
+  await dsh.call('rc-codex', 'remove', 'POST', { forgetKey: true })
+  assert.deepEqual(Object.keys(dsh.providers()), ['rc-claude'])
+  assert.equal(dsh.refs.has('RC_CLAUDE_API_KEY'), true)
+  assert.equal(dsh.refs.has('RC_CODEX_API_KEY'), false)
+})
+
+test('RC Codex root defaults to api.site and follows its own override', async () => {
+  const dsh = stubContext()
+  apply(dsh.ctx, {})
+  assert.equal((await dsh.call('rc-codex', 'state')).body.baseURL, 'https://api.site/v1')
+  const mirrored = stubContext()
+  apply(mirrored.ctx, { baseURL: 'https://starapi-mirror.example', roots: { 'rc-codex': 'https://rc-mirror.example' } })
+  assert.equal((await mirrored.call('rc-codex', 'state')).body.baseURL, 'https://rc-mirror.example/v1')
+  assert.equal((await mirrored.call('rc-claude', 'state')).body.baseURL, 'https://api.site/v1', 'one RC override does not move the other')
 })

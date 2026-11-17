@@ -11,6 +11,7 @@ window.__ModuleLoader__.load({
       titleClaude: 'StarAPI Claude',
       titleCodex: 'StarAPI Codex',
       titleRc: 'RC Claude',
+      titleRcCodex: 'RC Codex',
       checking: '檢查緊…',
       badgeReady: '已連接',
       badgeIdle: '未連接',
@@ -20,11 +21,13 @@ window.__ModuleLoader__.load({
       introClaude: '貼上 StarAPI Claude 分組嘅 API Key，插件會自動偵測你個帳號用得嘅 Claude 模型，並按 StarAPI 嘅 adaptive thinking 要求設定好協議同思考級別。Key 只會存入本機憑證庫。',
       introCodex: '貼上 StarAPI Codex 分組嘅 API Key，插件會自動偵測你個帳號用得嘅 GPT 模型同佢哋真正接受嘅思考級別（StarAPI 會照收 "none" 但當 medium 跑，所以呢度唔提供「關」）。Key 只會存入本機憑證庫。',
       introRc: '貼上 RC（api.site）嘅 API Key，插件會自動偵測你個帳號用得嘅 Claude 模型同思考級別。RC 行 OpenAI Responses，「off/none」係假關（照樣思考），所以呢度唔提供「關」。Key 只會存入本機憑證庫。',
+      introRcCodex: '貼上 RC（api.site）Codex 分組嘅 API Key，插件會自動偵測你個帳號用得嘅 GPT 模型同佢哋真正接受嘅思考級別。api.site 收到任何級別名都會回 200，所以插件會核對回傳嘅級別；「關」只會喺 none 真係關得到思考嘅模型先提供。Key 只會存入本機憑證庫。',
       introStoredKey: '憑證庫已經有呢個分組嘅 Key，可以直接連接，唔使再貼。',
       repairIntro: '現有設定有問題：',
       reason_protocol: '用咗呢組模型唔接受嘅協議',
       reason_adaptive: '冇開 adaptive thinking，一揀思考級別就會 400',
       reason_off_ignored: '聲明咗「關思考」，但 StarAPI 會照思考（"none" 當 medium 跑）',
+      reason_off_fake: '有模型聲明咗「關思考」或 minimal，但呢個模型其實照樣思考（none 當 low 跑），或者會回 400',
       reason_non_chat: '包含咗唔識對話嘅模型（例如圖像模型）',
       reason_no_levels: '有模型冇聲明思考級別',
       reason_context: '冇寫上下文上限，DSH 會當 1,000,000 token，遲早撞牆',
@@ -51,7 +54,7 @@ window.__ModuleLoader__.load({
       colMax: '最大輸出',
       unverified: '未驗證',
       noteDropped: '以下模型喺列表入面，但你個帳號實際調用唔到，已經略過：{models}',
-      noteSkipped: '以下模型喺列表入面，但唔係對話模型（例如圖像模型），已經略過：{models}',
+      noteSkipped: '以下模型喺列表入面，但唔係對話模型（例如圖像模型或者工具模型），已經略過：{models}',
       noteUnverified: '有 {count} 個模型未能實測（{reason}），暫時用咗預設設定。中轉服務回復正常之後㩒「重新偵測模型」。',
       noteUpstreamDown: '中轉服務而家呢組模型全部調用唔到（{reason}），所以全部用咗預設設定。供應商已經加好，等服務回復之後㩒「重新偵測模型」。',
       testTitle: '測試調用',
@@ -64,14 +67,14 @@ window.__ModuleLoader__.load({
       testFailed: '失敗：{message}',
       balance: '餘額 {balance} {unit}',
       today: '今日 {requests} 次請求',
-      sharedWallet: '（Claude 同 Codex 兩條 Key 共用同一個錢包）',
-      errKeyInvalid: 'StarAPI 唔接受呢條 Key。請檢查有冇抄錯，或者係咪抄咗另一個分組嘅 Key。',
+      sharedWallet: '（{relay} 嘅 Claude 同 Codex 兩條 Key 共用同一個錢包）',
+      errKeyInvalid: '{relay} 唔接受呢條 Key。請檢查有冇抄錯，或者係咪抄咗另一個分組嘅 Key。',
       errKeyMalformed: '呢條 Key 嘅格式唔啱。',
       errNoKey: '未有 Key，請貼上。',
       errNoModels: '呢條 Key 嘅帳號冇任何可用嘅對話模型。可能係抄錯咗分組嘅 Key。',
       errNoUsable: '列表入面嘅模型，你個帳號全部都調用唔到。',
-      errNetwork: '連唔到 StarAPI：{detail}',
-      errUpstream: 'StarAPI 回應異常：{detail}',
+      errNetwork: '連唔到 {relay}：{detail}',
+      errUpstream: '{relay} 回應異常：{detail}',
       errEditor: '呢個 profile 冇設定編輯器，寫唔到設定。',
       errPiAi: '呢個 profile 未啟用 llm-pi-ai 插件。',
       errBusy: '上一次設定仲未完成。',
@@ -84,6 +87,7 @@ window.__ModuleLoader__.load({
       titleClaude: 'StarAPI Claude',
       titleCodex: 'StarAPI Codex',
       titleRc: 'RC Claude',
+      titleRcCodex: 'RC Codex',
       checking: 'Checking…',
       badgeReady: 'Connected',
       badgeIdle: 'Not connected',
@@ -93,11 +97,13 @@ window.__ModuleLoader__.load({
       introClaude: "Paste the API key of StarAPI's Claude group. The plugin finds the Claude models your account can call and sets the protocol and thinking levels StarAPI requires. The key is stored only in the local credential store.",
       introCodex: 'Paste the API key of StarAPI\'s Codex group. The plugin finds the GPT models your account can call and the thinking levels they really accept (StarAPI accepts "none" but runs it as medium, so no "off" is offered here). The key is stored only in the local credential store.',
       introRc: 'Paste the RC (api.site) API key. The plugin finds the Claude models your account can call and their thinking levels. RC uses OpenAI Responses; "off/none" is fake (it still thinks), so no "off" is offered here. The key is stored only in the local credential store.',
+      introRcCodex: 'Paste the API key of the RC (api.site) Codex group. The plugin finds the GPT models your account can call and the thinking levels they really accept. api.site answers 200 to any level name, so the plugin checks the level it reports back; "off" is offered only on models where "none" really stops the thinking. The key is stored only in the local credential store.',
       introStoredKey: 'A key for this group is already stored, so you can connect without pasting it again.',
       repairIntro: 'The existing setup has problems: ',
       reason_protocol: 'it uses a protocol this group does not accept',
       reason_adaptive: 'adaptive thinking is off, so any thinking level fails with HTTP 400',
       reason_off_ignored: 'it declares "off", but StarAPI thinks anyway ("none" runs as medium)',
+      reason_off_fake: 'a model declares "off" or "minimal", but it thinks anyway ("none" runs as low) or answers HTTP 400',
       reason_non_chat: 'it lists models that cannot chat (image models, for example)',
       reason_no_levels: 'a model declares no thinking levels',
       reason_context: 'no context window is declared, so DSH assumes 1,000,000 tokens and will hit the real limit',
@@ -123,8 +129,8 @@ window.__ModuleLoader__.load({
       colContext: 'Context',
       colMax: 'Max output',
       unverified: 'not verified',
-      noteDropped: 'Listed by StarAPI but not callable by your account, so left out: {models}',
-      noteSkipped: 'Listed by StarAPI but not chat models (image models, for example), so left out: {models}',
+      noteDropped: 'Listed by the relay but not callable by your account, so left out: {models}',
+      noteSkipped: 'Listed by the relay but not chat models (image models or tool models, for example), so left out: {models}',
       noteUnverified: '{count} model(s) could not be tested ({reason}) and use default settings. Re-detect once the relay is back to normal.',
       noteUpstreamDown: 'The relay cannot call any model of this group right now ({reason}), so every model uses default settings. The provider is added; re-detect once the relay recovers.',
       testTitle: 'Test call',
@@ -137,14 +143,14 @@ window.__ModuleLoader__.load({
       testFailed: 'Failed: {message}',
       balance: 'Balance {balance} {unit}',
       today: '{requests} requests today',
-      sharedWallet: ' (the Claude and Codex keys share one wallet)',
-      errKeyInvalid: 'StarAPI refused this key. Check it was copied correctly, and that it is the key of this group.',
+      sharedWallet: ' (the {relay} Claude and Codex keys share one wallet)',
+      errKeyInvalid: '{relay} refused this key. Check it was copied correctly, and that it is the key of this group.',
       errKeyMalformed: 'That does not look like a key.',
       errNoKey: 'No key yet. Paste one.',
       errNoModels: "This key's account lists no usable chat model. It may be a key of the other group.",
       errNoUsable: 'Your account cannot call any of the listed models.',
-      errNetwork: 'StarAPI is unreachable: {detail}',
-      errUpstream: 'StarAPI answered unexpectedly: {detail}',
+      errNetwork: '{relay} is unreachable: {detail}',
+      errUpstream: '{relay} answered unexpectedly: {detail}',
       errEditor: 'This profile has no config editor, so the setup cannot be written.',
       errPiAi: 'The llm-pi-ai plugin is not enabled in this profile.',
       errBusy: 'The previous setup run has not finished.',
@@ -153,9 +159,11 @@ window.__ModuleLoader__.load({
     }
 
     const GROUPS = [
-      { id: 'claude', title: 'titleClaude', intro: 'introClaude', showContext: false, icon: '★', sharedWallet: true },
-      { id: 'codex', title: 'titleCodex', intro: 'introCodex', showContext: true, icon: '⌘', sharedWallet: true },
-      { id: 'rc-claude', title: 'titleRc', intro: 'introRc', showContext: true, icon: 'R', sharedWallet: false },
+      // Each relay's two keys share one wallet: StarAPI's Claude + Codex, and RC's Claude + Codex.
+      { id: 'claude', title: 'titleClaude', intro: 'introClaude', showContext: false, icon: '★', relay: 'StarAPI' },
+      { id: 'codex', title: 'titleCodex', intro: 'introCodex', showContext: true, icon: '⌘', relay: 'StarAPI' },
+      { id: 'rc-claude', title: 'titleRc', intro: 'introRc', showContext: true, icon: 'R', relay: 'RC' },
+      { id: 'rc-codex', title: 'titleRcCodex', intro: 'introRcCodex', showContext: true, icon: 'R', relay: 'RC' },
     ]
 
     const fill = (text, values) =>
@@ -188,7 +196,7 @@ window.__ModuleLoader__.load({
       return body
     }
 
-    const errorText = (t, code, detail) => {
+    const errorText = (t, code, detail, relay) => {
       const map = {
         KEY_INVALID: 'errKeyInvalid',
         KEY_MALFORMED: 'errKeyMalformed',
@@ -202,7 +210,7 @@ window.__ModuleLoader__.load({
         BUSY: 'errBusy',
         HOST: 'errHost',
       }
-      return fill(t(map[code] ?? 'errOther'), { detail: detail ?? code ?? '' })
+      return fill(t(map[code] ?? 'errOther'), { detail: detail ?? code ?? '', relay: relay ?? '' })
     }
 
     const formatTokens = (value) => {
@@ -332,7 +340,7 @@ window.__ModuleLoader__.load({
           const body = await api(group.id, 'test', { method: 'POST', body: { model: testModelId, effort: testEffort } })
           if (mounted.current) setTestResult(body.test)
         } catch (failure) {
-          if (mounted.current) setTestResult({ passed: false, failure: { message: errorText(t, failure.code, failure.detail) } })
+          if (mounted.current) setTestResult({ passed: false, failure: { message: errorText(t, failure.code, failure.detail, group.relay) } })
         } finally {
           if (mounted.current) setTesting(false)
         }
@@ -457,7 +465,7 @@ window.__ModuleLoader__.load({
         usage === null || usage.balance === null
           ? null
           : [
-              fill(t('balance'), { balance: usage.balance.toFixed(2), unit: usage.unit ?? '' }) + (group.sharedWallet ? t('sharedWallet') : ''),
+              fill(t('balance'), { balance: usage.balance.toFixed(2), unit: usage.unit ?? '' }) + fill(t('sharedWallet'), { relay: group.relay }),
               usage.todayRequests === null ? null : fill(t('today'), { requests: usage.todayRequests }),
             ]
               .filter(Boolean)
@@ -489,7 +497,7 @@ window.__ModuleLoader__.load({
         configured && !needsRepair && !running ? table : null,
         configured && !running ? notes.map((note, index) => h('p', { key: index, className: 'sac_warn' }, note)) : null,
         showKeyForm ? keyForm : null,
-        shown ? h('p', { className: 'sac_error', role: 'alert' }, errorText(t, shown.code, shown.detail)) : null,
+        shown ? h('p', { className: 'sac_error', role: 'alert' }, errorText(t, shown.code, shown.detail, group.relay)) : null,
         configured && !needsRepair && !running && models.length > 0
           ? h(
               'div',
@@ -561,6 +569,7 @@ window.__ModuleLoader__.load({
       .sac_icon{display:flex;flex:none;width:32px;height:32px;border-radius:9px;background:#b4532a;color:#fff;align-items:center;justify-content:center;font-size:16px}
       .sac_icon_codex{background:#1f6f5c}
       .sac_icon_rc-claude{background:#4b2e83}
+      .sac_icon_rc-codex{background:#2e4b83}
       .sac_heading{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1}
       .sac_titleRow{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
       .sac_title{margin:0;font-size:14px;line-height:20px;font-weight:600}

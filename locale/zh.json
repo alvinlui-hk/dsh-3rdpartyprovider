@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "StarAPI / RC 供應商",
-    "description": "每個中轉分組貼一次 Key（StarAPI Claude、StarAPI Codex、RC Claude），就將佢嘅模型加做可用嘅供應商，思考級別逐個模型實測設定。"
+    "description": "每個中轉分組貼一次 Key（StarAPI Claude、StarAPI Codex、RC Claude、RC Codex），就將佢嘅模型加做可用嘅供應商，思考級別逐個模型實測設定。"
   }
 }

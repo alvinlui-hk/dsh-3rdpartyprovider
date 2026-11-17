@@ -1,8 +1,9 @@
 /**
- * StarAPI for DeepSeek Harness — Host half.
+ * StarAPI / RC relays for DeepSeek Harness — Host half.
  *
- * StarAPI sells two key groups on one host, and each needs a provider profile
- * that a hand-made setup easily gets wrong:
+ * Four key groups on two relays (StarAPI: Claude + Codex; RC at api.site:
+ * Claude + Codex), and each needs a provider profile that a hand-made setup
+ * easily gets wrong. The two StarAPI groups:
  *
  * - **Claude** (`starapi-claude`): the models only work over Anthropic
  *   Messages with adaptive thinking (`thinking.type=adaptive` +
@@ -14,6 +15,11 @@
  *   "off" level silently does nothing; `xhigh` and `max` work but are easy to
  *   leave out; the group lists image models that cannot chat; and a
  *   hand-declared route gets a 1,000,000-token context window it does not have.
+ *
+ * The RC groups speak OpenAI Responses too. api.site answers 200 to any effort
+ * name and echoes the level it actually ran, so levels are judged by that echo,
+ * not by the status. On RC Codex `none` is a real off for some models and runs
+ * as `low` on others, so off is offered per model, only where the echo proves it.
  *
  * For each group this half turns "paste a key" into a correct `llm-pi-ai`
  * provider profile: validate the key against `GET /v1/models`, ask each listed
@@ -89,6 +95,9 @@ const CODEX_FALLBACK_CONTEXT = 272_000
 
 /** Listed by the Codex group but not chat models: they cannot answer a conversation. */
 export const NON_CHAT_MODEL = /image|dall-e|tts|whisper|transcri|embedding|moderation|realtime|audio|sora/i
+
+/** RC Codex lists Codex's own review helper beside the chat models; it is a tool model, not a chat route. */
+export const RC_CODEX_TOOL_MODEL = /^codex-auto-review/i
 
 export const inject = ['connection', 'credentials']
 
@@ -173,9 +182,28 @@ export function classifyRcAvailability(result) {
   return { state: 'unknown', reason: result.status === 0 ? result.errorType : `HTTP ${result.status}` }
 }
 
-/** Whether a Codex probe of one effort proves support (200), refusal (400), or nothing. */
-export function classifyEffort(result) {
-  if (result.status === 200) return true
+/**
+ * Whether a Responses probe of one effort proves support, refusal, or nothing.
+ * api.site answers 200 to any level name, running an unknown one as `high` and
+ * a capped one as the cap (`max` → `xhigh`), so when the gateway echoes the
+ * effort it ran, a different echo is a refusal. Without an echo, 200 is support.
+ */
+export function classifyEffort(result, requested) {
+  if (result.status === 200) {
+    const echoed = result.json?.reasoning?.effort
+    if (requested !== undefined && typeof echoed === 'string' && echoed !== requested) return false
+    return true
+  }
+  if (result.status === 400) return false
+  return undefined
+}
+
+/**
+ * Whether `effort: "none"` really switches thinking off. Only an echoed `none`
+ * proves it: some models take `none` and run `low`, which is a fake off.
+ */
+export function classifyOff(result) {
+  if (result.status === 200) return result.json?.reasoning?.effort === 'none'
   if (result.status === 400) return false
   return undefined
 }
@@ -201,8 +229,10 @@ export function claudeEfforts(id, off) {
  * these models document. Without `off`, a request with no level selected
  * omits `reasoning` and the model uses its own default (`medium`).
  */
-export function codexEfforts(xhigh, max) {
+export function codexEfforts(xhigh, max, off = false) {
   return {
+    // Only where a probe proved `none` switches thinking off; pi-ai then sends the stated wire value.
+    ...(off ? { off: 'none' } : {}),
     low: 'low',
     medium: 'medium',
     high: 'high',
@@ -236,6 +266,33 @@ export function buildCodexEntry(probe) {
   }
 }
 
+/**
+ * RC Codex models as measured on api.site (2026-11-17): `none` is a real off
+ * on gpt-6-sol and gpt-5.6-sol (echoed `none`, 0 reasoning tokens) and a fake
+ * one on gpt-6.1-sol and gpt-6-astra (echoed `low`); every chat model accepted
+ * `xhigh`, `max` and a 128000 output cap. Used only when a probe cannot answer.
+ */
+export const KNOWN_RC_CODEX = {
+  'gpt-5.6-sol': { off: true, xhigh: true, max: true, maxTokens: 128_000, contextWindow: 272_000 },
+  'gpt-6-sol': { off: true, xhigh: true, max: true, maxTokens: 128_000, contextWindow: 272_000 },
+  'gpt-6.1-terra': { off: true, xhigh: true, max: true, maxTokens: 128_000, contextWindow: 272_000 },
+  'gpt-6.1-sol': { off: false, xhigh: true, max: true, maxTokens: 128_000, contextWindow: 272_000 },
+  'gpt-6-astra': { off: false, xhigh: true, max: true, maxTokens: 128_000, contextWindow: 272_000 },
+}
+
+/** One RC Codex `models` entry from a probe result. An unprobed unknown model gets no `off`. */
+export function buildRcCodexEntry(probe) {
+  const known = KNOWN_RC_CODEX[probe.id] ?? KNOWN_CODEX[probe.id]
+  return {
+    id: probe.id,
+    name: probe.id,
+    input: ['text', 'image'],
+    contextWindow: known?.contextWindow ?? CODEX_FALLBACK_CONTEXT,
+    maxTokens: probe.cap ?? known?.maxTokens ?? FALLBACK_OUTPUT_CAP,
+    reasoningEfforts: codexEfforts(probe.xhigh ?? known?.xhigh ?? false, probe.max ?? known?.max ?? false, probe.off ?? KNOWN_RC_CODEX[probe.id]?.off ?? false),
+  }
+}
+
 /** What is wrong with an existing Claude profile, as stable codes the page words. */
 export function claudeRepairReasons(profile) {
   const reasons = []
@@ -256,6 +313,32 @@ export function codexRepairReasons(profile) {
   if (models.some((model) => NON_CHAT_MODEL.test(String(model?.id ?? '')))) reasons.push('non-chat')
   if (models.some((model) => !NON_CHAT_MODEL.test(String(model?.id ?? '')) && efforts(model) === undefined)) reasons.push('no-levels')
   if (models.some((model) => !NON_CHAT_MODEL.test(String(model?.id ?? '')) && typeof model?.contextWindow !== 'number')) reasons.push('context')
+  return reasons
+}
+
+/**
+ * What is wrong with an existing RC Codex profile. Unlike StarAPI, `off` is
+ * real on some of these models, so it is a fault only on a model known to run
+ * `none` as `low`, or when it is not sent as `none`. `minimal` is always a
+ * fault: several of these models answer it with 400.
+ */
+export function rcCodexRepairReasons(profile) {
+  const reasons = []
+  const models = Array.isArray(profile.models) ? profile.models : []
+  const efforts = (model) => (model?.reasoningEfforts !== null && typeof model?.reasoningEfforts === 'object' ? model.reasoningEfforts : undefined)
+  const chat = models.filter((model) => !NON_CHAT_MODEL.test(String(model?.id ?? '')))
+  if (profile.api !== 'openai-responses') reasons.push('protocol')
+  const badOff = (model) => {
+    const levels = efforts(model)
+    if (levels === undefined) return false
+    if (Object.hasOwn(levels, 'minimal')) return true
+    if (!Object.hasOwn(levels, 'off')) return false
+    return levels.off !== 'none' || KNOWN_RC_CODEX[model.id]?.off === false
+  }
+  if (models.some(badOff)) reasons.push('off-fake')
+  if (models.some((model) => NON_CHAT_MODEL.test(String(model?.id ?? '')))) reasons.push('non-chat')
+  if (chat.some((model) => efforts(model) === undefined)) reasons.push('no-levels')
+  if (chat.some((model) => typeof model?.contextWindow !== 'number')) reasons.push('context')
   return reasons
 }
 
@@ -434,29 +517,37 @@ async function probeClaude(root, key, id, deadline) {
   return { id, state: 'ok', off: availability.off, cap, verified: cap !== undefined, ...(cap === undefined ? { reason: 'output cap unconfirmed' } : {}) }
 }
 
-/** OpenAI Responses probe (Codex + RC Claude): availability at `low`, whether `xhigh`/`max` are accepted, then the output cap. */
-async function probeResponses(root, key, id, deadline, classify) {
+/**
+ * OpenAI Responses probe (StarAPI Codex, RC Claude, RC Codex): availability at
+ * `low`, whether `xhigh`/`max` are accepted, then the output cap.
+ * With `probeOff`, also whether `none` is a real off (RC Codex only: StarAPI
+ * and RC Claude run `none` as a default level, so their off is never offered).
+ */
+async function probeResponses(root, key, id, deadline, classify, { probeOff = false } = {}) {
   const ask = asker(root, key, '/v1/responses', 'bearer', deadline)
   const body = (effort, cap = 16) => ({ model: id, input: PING_TEXT, max_output_tokens: cap, store: false, reasoning: { effort } })
   const availability = classify(await ask(body('low')))
   if (availability.state !== 'ok') return { id, ...availability, verified: false }
-  const xhigh = classifyEffort(await ask(body('xhigh')))
-  const max = classifyEffort(await ask(body('max')))
+  const xhigh = classifyEffort(await ask(body('xhigh')), 'xhigh')
+  const max = classifyEffort(await ask(body('max')), 'max')
+  const off = probeOff ? classifyOff(await ask(body('none'))) : undefined
   const cap = await largestCap(async (value) => (await ask(body('low', value))).status === 200)
-  const verified = cap !== undefined && xhigh !== undefined && max !== undefined
+  const verified = cap !== undefined && xhigh !== undefined && max !== undefined && (!probeOff || off !== undefined)
   // The model answers, but a later probe did not: name which one, so the card never prints a blank reason.
   const reason = !verified
     ? xhigh === undefined
       ? 'xhigh unconfirmed'
       : max === undefined
         ? 'max unconfirmed'
-        : 'output cap unconfirmed'
+        : probeOff && off === undefined
+          ? 'off unconfirmed'
+          : 'output cap unconfirmed'
     : undefined
-  return { id, state: 'ok', xhigh, max, cap, verified, ...(reason === undefined ? {} : { reason }) }
+  return { id, state: 'ok', xhigh, max, ...(probeOff ? { off } : {}), cap, verified, ...(reason === undefined ? {} : { reason }) }
 }
 
 // ---------------------------------------------------------------------------
-// the two key groups
+// the key groups
 // ---------------------------------------------------------------------------
 
 export const FAMILIES = {
@@ -519,6 +610,24 @@ export const FAMILIES = {
     probe: (root, key, id, deadline) => probeResponses(root, key, id, deadline, classifyRcAvailability),
     entry: buildRcEntry,
     repairReasons: rcRepairReasons,
+  },
+  'rc-codex': {
+    id: 'rc-codex',
+    providerId: 'rc-codex',
+    keyRef: 'RC_CODEX_API_KEY',
+    displayName: 'RC Codex',
+    api: 'openai-responses',
+    gateway: 'rc',
+    defaultRoot: 'https://api.site',
+    baseFor: (root) => `${root}/v1`,
+    compat: undefined,
+    // Every chat model offers these, so any of them is a valid route default; off is per model.
+    defaultLevels: ['low', 'medium', 'high'],
+    isModel: (id) => /^(gpt-|o\d|codex)/i.test(id) && !NON_CHAT_MODEL.test(id) && !RC_CODEX_TOOL_MODEL.test(id),
+    isListedNonChat: (id) => /^(gpt-|o\d|codex|dall-e|sora)/i.test(id) && (NON_CHAT_MODEL.test(id) || RC_CODEX_TOOL_MODEL.test(id)),
+    probe: (root, key, id, deadline) => probeResponses(root, key, id, deadline, classifyRcAvailability, { probeOff: true }),
+    entry: buildRcCodexEntry,
+    repairReasons: rcCodexRepairReasons,
   },
 }
 
