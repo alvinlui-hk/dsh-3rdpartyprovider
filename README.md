@@ -2,11 +2,20 @@
 
 喺 DeepSeek Harness（DSH）一次過設定四個中轉（relay）供應商：**StarAPI Claude**、**StarAPI Codex（GPT）**、**RC Claude**、**RC Codex（GPT）**（RC 即係 api.site）。裝好之後喺 **設定 → 模型** 每個分組貼一次 API Key，插件會自動偵測你個帳號用得嘅模型，並寫好可以正常使用（包括思考模式）嘅供應商 `starapi-claude`、`starapi-codex`、`rc-claude`、`rc-codex`。
 
-非官方插件，同 StarAPI、api.site、OpenAI、Anthropic、DeepSeek 冇關係。
+非官方插件，同 StarAPI、RightAPI（api.site）、OpenAI、Anthropic、DeepSeek 冇關係。README 下面有作者提供、含推薦碼嘅供應商註冊連結；按供應商計劃條款，使用推薦連結可能令作者獲得推薦獎勵。
 
 > 由 1.3.1 起，插件顯示名改為 **3rdPartyProvider for DSH**（原名 StarAPI / RC providers）。今次只改品牌，唔改供應商功能；目前支援上面四個分組，唔係通用嘅任意供應商設定器。
 >
 > 為咗直接升級，package 名 `@alvinlui-hk/dsh-starapi`、插件 ID `starapi`、`/api/starapi/` 後台路徑、四個供應商 ID 同憑證 Key 名全部保留。現有設定同已儲存嘅 Key 唔使搬，亦唔使移除舊插件再裝。GitHub repo 已更名為 [`alvinlui-hk/dsh-3rdpartyprovider`](https://github.com/alvinlui-hk/dsh-3rdpartyprovider)；舊網址由 GitHub 轉址，建議新安裝改用新網址。已發布嘅 v1.3.1 tag 保持不變，當中提及 repo 暫時保留原名嘅文字係更名前嘅歷史說明。
+
+## 供應商註冊邀請連結
+
+以下係作者提供嘅推薦註冊連結，連結內含推薦碼：
+
+- **StarAPI**（StarAPI Claude、StarAPI Codex）：[註冊 StarAPI](https://www.starapi.io/register?aff=XG9U534DC4FT)
+- **RightAPI**（RC Claude、RC Codex；本插件 RC 組預設 API 位址為 `api.site`）：[註冊 RightAPI](https://rightapi.io/register?aff=9bb2d133)
+
+使用與否完全自願；請先自行查看供應商條款、收費及私隱政策。作者可能按供應商推薦計劃獲得獎勵。
 
 ## 點解需要呢個插件
 
