@@ -68,6 +68,8 @@ claude-fable-5-2 requires adaptive thinking; omit thinking or use thinking.type=
 
 如果插件已裝舊版，請用 DSH 插件頁原地更新，唔好移除後另裝一份；package 名、插件 ID、供應商 ID 同已存 Key 都刻意保持不變。
 
+如果你已經用 `npm pack` 打包 v1.3.1，亦可以喺「包名或地址」貼入 `alvinlui-hk-dsh-starapi-1.3.1.tgz` 嘅絕對路徑。用路徑安裝後請保留原檔，profile 之後重裝依賴仍可能需要讀取佢。
+
 ### 方法二：用 DSH 入面嘅 Agent
 
 要求 Agent 將以上 GitHub tag archive URL 安裝到**目前 profile**並啟用。確認安裝結果係 1.3.1、`application: applied`（或者依介面提示正常重啟），唔好將 URL 貼去一般對話當成安裝完成。
@@ -81,6 +83,16 @@ DSH 插件管理器支援從 npm registry 安裝 bundle。發佈後可喺 **插�
 ```
 
 亦可以要求 DSH Agent 安裝同一個 package spec。呢個係透過 DSH 插件管理器安裝到 profile，唔係喺任意目錄執行 `npm install`。截至 2026-11-25，npm registry 尚未有呢個 package；喺 npm 發佈完成前，請用上面嘅 GitHub tag archive 安裝。請勿用 `@latest` 代替指定版本，除非你確認咗最新 release。
+
+## DSH Discover 市場索引
+
+本 repo 提供一份第三方社群索引：
+
+```text
+https://raw.githubusercontent.com/alvinlui-hk/dsh-3rdpartyprovider/main/market/index.json
+```
+
+喺有啟用 DSH Plugin Market／Discover 嘅 profile，將呢個 URL 加入自訂 index，就可以由索引瀏覽並安裝固定版本。現時 DSH 官方 profile 預設未必有啟用自訂 market bundle 或設定任何 index；加咗呢個檔案唔會自動令插件出現喺所有用戶嘅 Discover。呢份係**社群索引，唔係 DSH 官方目錄收錄或背書**。索引版本以 Git commit 固定喺 v1.3.1 tag 對應嘅 commit，無需 npm package。
 
 ## macOS 驗證紀錄
 

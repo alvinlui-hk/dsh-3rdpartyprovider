@@ -1,0 +1,54 @@
+{
+  "format": 1,
+  "title": {
+    "en": "Community DSH Plugins",
+    "zh": "DSH 社群插件"
+  },
+  "description": {
+    "en": "Third-party plugins for DeepSeek Harness. This index is community-maintained and is not an official DeepSeek Harness catalog.",
+    "zh": "DeepSeek Harness 第三方插件索引，由社群維護，並非 DeepSeek Harness 官方目錄。"
+  },
+  "plugins": [
+    {
+      "name": "@alvinlui-hk/dsh-starapi",
+      "title": {
+        "en": "3rdPartyProvider for DSH",
+        "zh": "DSH 第三方模型供應商"
+      },
+      "description": {
+        "en": "Configure StarAPI Claude, StarAPI Codex, RC Claude, and RC Codex relay providers in DSH, with account-specific model discovery and per-model reasoning settings.",
+        "zh": "喺 DSH 設定 StarAPI Claude、StarAPI Codex、RC Claude 同 RC Codex 中轉供應商，並按帳戶偵測模型及各模型推理設定。"
+      },
+      "icon": "https://raw.githubusercontent.com/alvinlui-hk/dsh-3rdpartyprovider/v1.3.1/icon.svg",
+      "author": "Alvin Lui",
+      "homepage": "https://github.com/alvinlui-hk/dsh-3rdpartyprovider",
+      "repository": {
+        "url": "https://github.com/alvinlui-hk/dsh-3rdpartyprovider"
+      },
+      "metadata": {
+        "keywords": [
+          "deepseek-harness",
+          "dsh-plugin",
+          "starapi",
+          "claude",
+          "codex",
+          "third-party-provider"
+        ]
+      },
+      "versions": [
+        {
+          "version": "1.3.1",
+          "publishTimestamp": 1794885232,
+          "source": {
+            "type": "git",
+            "url": "https://github.com/alvinlui-hk/dsh-3rdpartyprovider",
+            "commit": "4354e41782d5d6fe679b81b416b60cae287e29bd"
+          },
+          "engines": {
+            "dsh": ">=0.2.2-rc.1"
+          }
+        }
+      ]
+    }
+  ]
+}
