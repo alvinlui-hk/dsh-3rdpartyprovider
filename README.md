@@ -74,15 +74,15 @@ claude-fable-5-2 requires adaptive thinking; omit thinking or use thinking.type=
 
 要求 Agent 將以上 GitHub tag archive URL 安裝到**目前 profile**並啟用。確認安裝結果係 1.3.1、`application: applied`（或者依介面提示正常重啟），唔好將 URL 貼去一般對話當成安裝完成。
 
-### 方法三：npm registry（待 npm 發佈後）
+### 方法三：由 npm 安裝（指定版本）
 
-DSH 插件管理器支援從 npm registry 安裝 bundle。發佈後可喺 **插件 → 添加插件** 輸入：
+[`@alvinlui-hk/dsh-starapi@1.3.1`](https://www.npmjs.com/package/@alvinlui-hk/dsh-starapi/v/1.3.1) 已公開發佈。喺 DSH **插件 → 添加插件** 嘅「包名或地址」貼入：
 
 ```text
 @alvinlui-hk/dsh-starapi@1.3.1
 ```
 
-亦可以要求 DSH Agent 安裝同一個 package spec。呢個係透過 DSH 插件管理器安裝到 profile，唔係喺任意目錄執行 `npm install`。截至 2026-11-25，npm registry 尚未有呢個 package；喺 npm 發佈完成前，請用上面嘅 GitHub tag archive 安裝。請勿用 `@latest` 代替指定版本，除非你確認咗最新 release。
+確認版本後安裝並啟用。要用 Agent，可以叫佢「將 `@alvinlui-hk/dsh-starapi@1.3.1` 由 npm 安裝到目前 DSH profile 並啟用」。如果已經由 GitHub 裝好 v1.3.1，唔使轉來源或再裝一次。
 
 ## DSH Discover 市場索引
 
