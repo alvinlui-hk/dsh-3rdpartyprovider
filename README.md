@@ -57,31 +57,36 @@ claude-fable-5-2 requires adaptive thinking; omit thinking or use thinking.type=
 
 ## 安裝
 
-需要 DeepSeek Harness `0.2.2-rc.1` 或以上，同有 Web 介面嘅 profile（Desktop 或 `dsh web`）。將 `alvinlui-hk-dsh-starapi-1.3.1.tgz` 抄去嗰部電腦，然後揀一個方法。
+需要 DeepSeek Harness `0.2.2-rc.1` 或以上，同有 Web 介面嘅 profile（Desktop 或 `dsh web`）。插件係 DSH bundle，請用 DSH 插件管理器安裝；單獨執行一般 `npm install` 唔會將插件加入 DSH profile。
 
-### 方法一：喺 DSH 介面安裝（唔使開 terminal）
+### 方法一：喺 DSH 介面安裝（macOS／Windows／Linux）
 
-1. 開 DSH，去左邊 **插件** 頁面，㩒右上角 **添加插件**。
-2. 喺「包名或地址」貼入 `.tgz` 嘅**絕對路徑**，例如 `C:\Users\you\Downloads\alvinlui-hk-dsh-starapi-1.3.1.tgz`。
-3. 㩒 **安装**，再㩒 **立即启用**。
+1. 開 DSH，去 **插件** 頁面，㩒 **添加插件**。
+2. 喺「包名或地址」貼入 v1.3.1 tag archive：
+   `https://github.com/alvinlui-hk/dsh-3rdpartyprovider/archive/refs/tags/v1.3.1.tar.gz`
+3. 安裝並啟用 `@alvinlui-hk/dsh-starapi`。確認版本係 `1.3.1`，而且只有一個 `include:starapi` entry。
 
-裝完唔好移動或者刪除個 `.tgz`：profile 記住嘅係呢個路徑，之後重裝依賴會再讀佢。
+如果插件已裝舊版，請用 DSH 插件頁原地更新，唔好移除後另裝一份；package 名、插件 ID、供應商 ID 同已存 Key 都刻意保持不變。
 
-### 方法二：叫 DSH 入面嘅 Agent 安裝
+### 方法二：用 DSH 入面嘅 Agent
+
+要求 Agent 將以上 GitHub tag archive URL 安裝到**目前 profile**並啟用。確認安裝結果係 1.3.1、`application: applied`（或者依介面提示正常重啟），唔好將 URL 貼去一般對話當成安裝完成。
+
+### 方法三：npm registry（待 npm 發佈後）
+
+DSH 插件管理器支援從 npm registry 安裝 bundle。發佈後可喺 **插件 → 添加插件** 輸入：
 
 ```text
-將 C:\Users\you\Downloads\alvinlui-hk-dsh-starapi-1.3.1.tgz 作為 bundle 安裝到當前 profile 並啟用。
+@alvinlui-hk/dsh-starapi@1.3.1
 ```
 
-### 方法三：命令行
+亦可以要求 DSH Agent 安裝同一個 package spec。呢個係透過 DSH 插件管理器安裝到 profile，唔係喺任意目錄執行 `npm install`。截至 2026-11-25，npm registry 尚未有呢個 package；喺 npm 發佈完成前，請用上面嘅 GitHub tag archive 安裝。請勿用 `@latest` 代替指定版本，除非你確認咗最新 release。
 
-Desktop 版要先完全退出 DSH：
+## macOS 驗證紀錄
 
-```powershell
-& "$env:LOCALAPPDATA\Programs\DeepSeek Harness\resources\runtime\cli\bin\dsh.cmd" plugin --profile desktop add "C:\Users\you\Downloads\alvinlui-hk-dsh-starapi-1.3.1.tgz"
-```
+2026-11-25 已喺一部 Apple Silicon Mac 完成 v1.3.1 驗證：DSH `0.2.2-rc.5`，由指定 GitHub tag 首次安裝，插件管理器回報 `application: applied`、`warnings: []`，安裝 package 同 tag 原始碼核對一致。用戶實際確認插件名稱、圖示及設定頁四張供應商卡正常；四組連接／模型偵測完成，預設模型及其他原有供應商設定保留。Node `v26.12.1` 執行指定自動測試，47 通過、0 失敗、0 跳過。
 
-`dsh web` 用 `--profile web`。
+限制：該次測試冇按四張卡嘅獨立「測試」掣，因此卡片最終冒煙調用未驗證；context window 等部分值係程式設定或 fallback，唔應視為長上下文實測。完整逐機報告由使用者保留；此處只摘要驗證結果。
 
 ## 使用
 
